@@ -1,3 +1,3 @@
 module github.com/zyedidia/gotcl
 
-go 1.18
+go 1.13
