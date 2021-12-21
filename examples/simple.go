@@ -1,6 +1,6 @@
 package main
 
-import "gotcl"
+import "github.com/zyedidia/gotcl"
 
 var code = `
 proc sumto max {

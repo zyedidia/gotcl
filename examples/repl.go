@@ -4,13 +4,11 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"gotcl"
 	"io"
 	"os"
-	"runtime"
-)
 
-var nogc = flag.Bool("nogc", false, "if true, gc is disabled")
+	"github.com/zyedidia/gotcl"
+)
 
 func RunRepl(in io.Reader, out io.Writer, fn func(string) (string, error)) {
 	inbuf := bufio.NewReader(in)
@@ -63,10 +61,6 @@ func setArgs(i *gotcl.Interp, args []string, interactive bool) {
 
 func main() {
 	flag.Parse()
-	if *nogc {
-		runtime.MemStats.EnableGC = false
-		println("GC disabled.")
-	}
 	args := flag.Args()
 	if len(args) == 1 {
 		filename := args[0]
