@@ -451,10 +451,10 @@ func tclLindex(i *Interp, args []*TclObj) TclStatus {
 	}
 	ind, err := args[1].AsInt()
 	if err != nil {
-		i.Fail(err)
+		return i.Fail(err)
 	}
 	if ind >= len(l) {
-		i.FailStr("out of bounds")
+		return i.FailStr("out of bounds")
 	}
 	return i.Return(l[ind])
 }
