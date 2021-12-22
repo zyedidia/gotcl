@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-// Simple struct for embedding in every 
+// Simple struct for embedding in every
 // token except the expand token to mark them
 // as not an expand token.
 // This is gross, but we need to check for expands
@@ -213,7 +213,7 @@ type command struct {
 
 // a simpleTok is a token that won't change.
 // As such, we can get it's TclObj value without
-// regard to interpreter state. This is used to 
+// regard to interpreter state. This is used to
 // cache evaluated arguments.
 type simpleTok interface {
 	AsTclObj() *TclObj
@@ -423,6 +423,14 @@ func FromList(l []string) *TclObj {
 	vl := make([]*TclObj, len(l))
 	for i, s := range l {
 		vl[i] = FromStr(s)
+	}
+	return fromList(vl)
+}
+
+func FromIntList(l []int) *TclObj {
+	vl := make([]*TclObj, len(l))
+	for i, s := range l {
+		vl[i] = FromInt(s)
 	}
 	return fromList(vl)
 }
