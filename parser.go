@@ -154,7 +154,7 @@ func (p *parser) parseBlockData() string {
 }
 
 func (p *parser) hasExtraChars() bool {
-	return p.ch != -1 && !unicode.IsSpace(p.ch) && p.ch != '}' && p.ch != ']'
+	return p.ch != -1 && !unicode.IsSpace(p.ch) && p.ch != '}' && p.ch != ']' && p.ch != ';'
 }
 
 func (p *parser) checkForExtraChars() {
