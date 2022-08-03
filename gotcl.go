@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strconv"
@@ -32,15 +33,16 @@ type tliteral struct {
 
 func (l *tliteral) AsTclObj() *TclObj {
 	if l.tval == nil {
-		l.tval = FromStr(l.strval)
+		l.tval = FromStrLoc(l.strval, l.loc)
 	}
 	return l.tval
 }
 
 func (l *tliteral) String() string { return l.strval }
 func (l *tliteral) Eval(i *Interp) TclStatus {
+	i.loc = l.loc
 	if l.tval == nil {
-		l.tval = FromStr(l.strval)
+		l.tval = FromStrLoc(l.strval, l.loc)
 	}
 	i.retval = l.tval
 	return kTclOK
@@ -55,6 +57,7 @@ type subcommand struct {
 
 func (s *subcommand) String() string { return "[" + s.cmd.String() + "]" }
 func (s *subcommand) Eval(i *Interp) TclStatus {
+	i.loc = s.loc
 	return s.cmd.eval(i)
 }
 
@@ -70,14 +73,15 @@ func (b *block) String() string { return "{" + b.strval + "}" }
 
 func (b *block) AsTclObj() *TclObj {
 	if b.tval == nil {
-		b.tval = FromStr(b.strval)
+		b.tval = FromStrLoc(b.strval, b.loc)
 	}
 	return b.tval
 }
 
 func (b *block) Eval(i *Interp) TclStatus {
+	i.loc = b.loc
 	if b.tval == nil {
-		b.tval = FromStr(b.strval)
+		b.tval = FromStrLoc(b.strval, b.loc)
 	}
 	return i.Return(b.tval)
 }
@@ -93,6 +97,7 @@ func (e *expandTok) isExpand() bool {
 }
 
 func (e *expandTok) Eval(i *Interp) TclStatus {
+	i.loc = e.loc
 	return e.subject.Eval(i)
 }
 
@@ -104,6 +109,7 @@ func (e *expandTok) String() string {
 type strlit struct {
 	notExpand
 	toks []littok
+	loc  loc
 }
 
 const (
@@ -150,6 +156,7 @@ func (t strlit) String() string {
 }
 
 func (t strlit) Eval(i *Interp) TclStatus {
+	i.loc = t.loc
 	var res bytes.Buffer
 	for _, tok := range t.toks {
 		s, rc := tok.evalStr(i)
@@ -158,7 +165,7 @@ func (t strlit) Eval(i *Interp) TclStatus {
 		}
 		res.WriteString(s)
 	}
-	return i.Return(FromStr(res.String()))
+	return i.Return(FromStrLoc(res.String(), t.loc))
 }
 
 // $...
@@ -167,9 +174,11 @@ type varRef struct {
 	is_global bool
 	name      string
 	arrind    tclTok
+	loc       loc
 }
 
 func (v varRef) Eval(i *Interp) TclStatus {
+	i.loc = v.loc
 	x, e := i.getVar(v)
 	if e != nil {
 		return i.Fail(e)
@@ -306,6 +315,7 @@ type Interp struct {
 	err      error
 	cmdcount int
 	file     string
+	loc      loc
 }
 
 func (i *Interp) Return(val *TclObj) TclStatus {
@@ -314,7 +324,7 @@ func (i *Interp) Return(val *TclObj) TclStatus {
 }
 
 func (i *Interp) Fail(err error) TclStatus {
-	i.err = err
+	i.err = fmt.Errorf("%v: %v", i.loc, err)
 	return kTclErr
 }
 
@@ -330,6 +340,7 @@ type TclObj struct {
 	cmdsval    []command
 	vrefval    *varRef
 	exprval    eterm
+	loc        loc
 }
 
 func (t *TclObj) AsString() string {
@@ -376,7 +387,7 @@ func (t *TclObj) AsInt() (int, error) {
 
 func (t *TclObj) asCmds() ([]command, error) {
 	if t.cmdsval == nil {
-		c, e := parseCommands(strings.NewReader(t.AsString()), "<cmds>")
+		c, e := parseCommands(strings.NewReader(t.AsString()), loc{"<cmds>", 0, 0})
 		if e != nil {
 			return nil, e
 		}
@@ -400,6 +411,10 @@ func (t *TclObj) asVarRef() varRef {
 		t.vrefval = &vr
 	}
 	return *t.vrefval
+}
+
+func FromStrLoc(s string, loc loc) *TclObj {
+	return &TclObj{value: &s, loc: loc}
 }
 
 func FromStr(s string) *TclObj {
@@ -464,7 +479,7 @@ func (t *TclObj) AsList() ([]*TclObj, error) {
 
 func (t *TclObj) asExpr() (eterm, error) {
 	if t.exprval == nil {
-		ev, err := parseExpr(strings.NewReader(t.AsString()))
+		ev, err := parseExpr(strings.NewReader(t.AsString()), t.loc)
 		if err != nil {
 			return nil, err
 		}
@@ -474,7 +489,7 @@ func (t *TclObj) asExpr() (eterm, error) {
 }
 
 func parseList(txt string) ([]*TclObj, error) {
-	lst, err := parseListInner(strings.NewReader(txt), "<list>")
+	lst, err := parseListInner(strings.NewReader(txt), loc{"<list>", 0, 0})
 	if err != nil {
 		return nil, err
 	}
@@ -773,7 +788,7 @@ func (i *Interp) EvalString(s string) (*TclObj, error) {
 }
 
 func (i *Interp) Run(in io.Reader) (*TclObj, error) {
-	cmds, e := parseCommands(bufio.NewReader(in), i.file)
+	cmds, e := parseCommands(bufio.NewReader(in), loc{i.file, 0, 0})
 	if e != nil {
 		return nil, e
 	}

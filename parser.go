@@ -15,7 +15,7 @@ type loc struct {
 }
 
 func (l loc) String() string {
-	return fmt.Sprintf("%s:%d:%d", l.file, l.line, l.col)
+	return fmt.Sprintf("%s:%d:%d", l.file, l.line+1, l.col)
 }
 
 type parser struct {
@@ -25,15 +25,11 @@ type parser struct {
 	src    loc
 }
 
-func newParser(input io.RuneReader, name string) *parser {
+func newParser(input io.RuneReader, loc loc) *parser {
 	p := &parser{
 		data:   input,
 		tmpbuf: bytes.NewBuffer(make([]byte, 0, 1024)),
-		src: loc{
-			file: name,
-			line: 1,
-			col:  0,
-		},
+		src:    loc,
 	}
 	p.advance()
 	return p
@@ -118,6 +114,7 @@ func isword(c rune) bool {
 	return !unicode.IsSpace(c)
 }
 func (p *parser) parseSimpleWordTil(til rune) *tliteral {
+	loc := p.src
 	p.tmpbuf.Reset()
 	prev_esc := false
 	for p.ch != -1 && p.ch != til {
@@ -140,10 +137,11 @@ func (p *parser) parseSimpleWordTil(til rune) *tliteral {
 	if len(res) == 0 {
 		p.expectFailed("word", p.ch)
 	}
-	return &tliteral{strval: res, loc: p.src}
+	return &tliteral{strval: res, loc: loc}
 }
 
 func (p *parser) parseSubcommand() *subcommand {
+	loc := p.src
 	p.consumeRune('[')
 	res := make([]tclTok, 0, 16)
 	p.eatWhile(issepspace)
@@ -152,7 +150,7 @@ func (p *parser) parseSubcommand() *subcommand {
 		p.eatWhile(issepspace)
 	}
 	p.consumeRune(']')
-	return &subcommand{cmd: makeCommand(res), loc: p.src}
+	return &subcommand{cmd: makeCommand(res), loc: loc}
 }
 
 func (p *parser) parseBlockData() string {
@@ -189,18 +187,20 @@ func (p *parser) checkForExtraChars() {
 }
 
 func (p *parser) parseBlock() *block {
+	loc := p.src
 	bd := p.parseBlockData()
 	p.checkForExtraChars()
-	return &block{strval: bd, loc: p.src}
+	return &block{strval: bd, loc: loc}
 }
 
 func (p *parser) parseBlockOrExpand() tclTok {
+	loc := p.src
 	bd := p.parseBlockData()
 	if bd == "*" && p.hasExtraChars() {
-		return &expandTok{subject: p.parseToken(), loc: p.src}
+		return &expandTok{subject: p.parseToken(), loc: loc}
 	}
 	p.checkForExtraChars()
-	return &block{strval: bd, loc: p.src}
+	return &block{strval: bd, loc: loc}
 }
 
 func (p *parser) parseVariable() varRef {
@@ -209,6 +209,7 @@ func (p *parser) parseVariable() varRef {
 }
 
 func (p *parser) parseVarRef() varRef {
+	loc := p.src
 	if p.ch == '{' {
 		return toVarRef(p.parseBlockData())
 	}
@@ -225,7 +226,7 @@ func (p *parser) parseVarRef() varRef {
 		ind = p.parseTokenTil(')')
 		p.consumeRune(')')
 	}
-	return varRef{is_global: global, name: name, arrind: ind}
+	return varRef{is_global: global, name: name, arrind: ind, loc: loc}
 }
 
 var escMap = map[rune]string{
@@ -261,6 +262,7 @@ func (p *parser) parseListStringLit() string {
 }
 
 func (p *parser) parseStringLit() strlit {
+	loc := p.src
 	p.consumeRune('"')
 	var accum bytes.Buffer
 	toks := make([]littok, 0, 8)
@@ -275,7 +277,7 @@ func (p *parser) parseStringLit() strlit {
 		case '"':
 			record_accum()
 			p.advance()
-			return strlit{toks: toks}
+			return strlit{toks: toks, loc: loc}
 		case '$':
 			record_accum()
 			vref := p.parseVariable()
@@ -385,15 +387,15 @@ func setError(err *error) {
 	}
 }
 
-func parseListInner(in io.RuneReader, name string) (items []string, err error) {
-	p := newParser(in, name)
+func parseListInner(in io.RuneReader, loc loc) (items []string, err error) {
+	p := newParser(in, loc)
 	defer setError(&err)
 	items = p.parseList()
 	return
 }
 
-func parseCommands(in io.RuneReader, name string) (cmds []command, err error) {
-	p := newParser(in, name)
+func parseCommands(in io.RuneReader, loc loc) (cmds []command, err error) {
+	p := newParser(in, loc)
 	defer setError(&err)
 	cmds = p.parseCommands()
 	return

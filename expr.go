@@ -293,8 +293,8 @@ func balance(b *binOpNode) eterm {
 	return b
 }
 
-func parseExpr(in io.RuneReader) (item eterm, err error) {
-	p := newParser(in, "<expr>")
+func parseExpr(in io.RuneReader, loc loc) (item eterm, err error) {
+	p := newParser(in, loc)
 	defer setError(&err)
 	item = p.parseExpr()
 	return
@@ -460,7 +460,7 @@ func (p *parser) parseBinOpNode(a eterm) eterm {
 
 func tclExpr(i *Interp, args []*TclObj) TclStatus {
 	if len(args) == 0 {
-		return i.FailStr("wrong # args")
+		return i.FailStr("expr: no arguments provided")
 	}
 	var expr eterm
 	var err error

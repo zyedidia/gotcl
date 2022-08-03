@@ -70,7 +70,7 @@ func tclOpen(i *Interp, args []*TclObj) TclStatus {
 	}
 	channame := fmt.Sprintf("file%d", getUniqueNum())
 	i.chans[channame] = bufio.NewReader(ff)
-	return i.Return(FromStr(channame))
+	return i.Return(FromStrLoc(channame, i.loc))
 }
 
 func tclUpvar(i *Interp, args []*TclObj) TclStatus {
@@ -150,7 +150,7 @@ func tclCatch(i *Interp, args []*TclObj) TclStatus {
 	if len(args) == 2 {
 		val := kNil
 		if r == kTclErr {
-			val = FromStr(i.err.Error())
+			val = FromStrLoc(i.err.Error(), i.loc)
 		} else if r == kTclOK {
 			val = i.retval
 		}
@@ -467,12 +467,16 @@ func concat(args []*TclObj) *TclObj {
 		}
 		result.WriteString(strings.TrimSpace(x.AsString()))
 	}
-	return FromStr(result.String())
+	loc := loc{"<unknown>", 0, 0}
+	if len(args) > 0 {
+		loc = args[0].loc
+	}
+	return FromStrLoc(result.String(), loc)
 }
 
 func tclEval(i *Interp, args []*TclObj) TclStatus {
 	if len(args) == 0 {
-		return i.FailStr("wrong # args")
+		return i.FailStr("eval: no arguments")
 	}
 	if len(args) == 1 {
 		return i.EvalObj(args[0])
@@ -486,7 +490,7 @@ func tclConcat(i *Interp, args []*TclObj) TclStatus {
 
 func tclLappend(i *Interp, args []*TclObj) TclStatus {
 	if len(args) == 0 {
-		return i.FailStr("wrong # args")
+		return i.FailStr("lappend: no arguments")
 	}
 	vname := args[0].asVarRef()
 	v, ve := i.getVar(vname)
@@ -527,7 +531,7 @@ func tclTime(i *Interp, args []*TclObj) TclStatus {
 		if rc != kTclOK {
 			return rc
 		}
-		return i.Return(FromStr(formatTime(dur)))
+		return i.Return(FromStrLoc(formatTime(dur), i.loc))
 	} else if len(args) == 2 {
 		count, err := args[1].AsInt()
 		if err != nil {
@@ -539,14 +543,14 @@ func tclTime(i *Interp, args []*TclObj) TclStatus {
 			total += dur
 		}
 		avg := total / int64(count)
-		return i.Return(FromStr(formatTime(avg) + " per iteration"))
+		return i.Return(FromStrLoc(formatTime(avg)+" per iteration", i.loc))
 	}
-	return i.FailStr("wrong # args")
+	return i.FailStr(fmt.Sprintf("time: expected 1 or 2 arguments, got %d", len(args)))
 }
 
 func tclFlush(i *Interp, args []*TclObj) TclStatus {
 	if len(args) != 1 {
-		return i.FailStr("wrong # args")
+		return i.FailStr(fmt.Sprintf("flush: expected 1 argument, got %d", len(args)))
 	}
 	outfile, ok := i.chans[args[0].AsString()]
 	if !ok {
@@ -594,7 +598,7 @@ func tclPuts(i *Interp, args []*TclObj) TclStatus {
 
 func tclGets(i *Interp, args []*TclObj) TclStatus {
 	if len(args) != 1 && len(args) != 2 {
-		return i.FailStr("gets: wrong # args")
+		return i.FailStr("gets: need 1 or 2 arguments")
 	}
 	ini, ok := i.chans[args[0].AsString()]
 	if !ok {
@@ -616,14 +620,14 @@ func tclGets(i *Interp, args []*TclObj) TclStatus {
 		str = str[:len(str)-1]
 	}
 	if len(args) == 2 {
-		i.setVar(args[1].asVarRef(), FromStr(str))
+		i.setVar(args[1].asVarRef(), FromStrLoc(str, i.loc))
 		retval := len(str)
 		if eof {
 			retval = -1
 		}
 		return i.Return(FromInt(retval))
 	}
-	return i.Return(FromStr(str))
+	return i.Return(FromStrLoc(str, i.loc))
 }
 
 func getVarNameList(m varMap) *TclObj {
@@ -652,7 +656,7 @@ var infoEn = ensembleSpec{
 
 func varExists(i *Interp, args []*TclObj) TclStatus {
 	if len(args) != 1 {
-		return i.FailStr("wrong # args")
+		return i.FailStr(fmt.Sprintf("exists: need 1 argument, got %d", len(args)))
 	}
 	vn := args[0].asVarRef()
 	_, err := i.getVar(vn)
@@ -679,7 +683,7 @@ func getCmdNames(i *Interp, args []*TclObj) TclStatus {
 	ind := 0
 	for n := range i.cmds {
 		if !filtered || GlobMatch(pattern, n) {
-			cmds[ind] = FromStr(n)
+			cmds[ind] = FromStrLoc(n, i.loc)
 			ind++
 		}
 	}
@@ -710,7 +714,7 @@ func strIndex(i *Interp, args []*TclObj) TclStatus {
 	if ind >= len(str) {
 		return i.Return(kNil)
 	}
-	return i.Return(FromStr(str[ind : ind+1]))
+	return i.Return(FromStrLoc(str[ind:ind+1], i.loc))
 }
 
 var arrayEn = ensembleSpec{
@@ -748,7 +752,7 @@ func arrayGet(i *Interp, args []*TclObj) TclStatus {
 	res := make([]*TclObj, len(arr.arrdata)*2)
 	ind := 0
 	for k, v := range arr.arrdata {
-		res[ind] = FromStr(k)
+		res[ind] = FromStrLoc(k, i.loc)
 		res[ind+1] = v
 		ind += 2
 	}
@@ -784,7 +788,7 @@ func tclSource(i *Interp, args []*TclObj) TclStatus {
 		return i.Fail(e)
 	}
 	defer file.Close()
-	cmds, pe := parseCommands(bufio.NewReader(file), filename)
+	cmds, pe := parseCommands(bufio.NewReader(file), loc{filename, 0, 0})
 	if pe != nil {
 		return i.Fail(pe)
 	}
