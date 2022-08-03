@@ -27,6 +27,7 @@ type tliteral struct {
 	notExpand
 	strval string
 	tval   *TclObj // cached
+	loc    loc
 }
 
 func (l *tliteral) AsTclObj() *TclObj {
@@ -49,6 +50,7 @@ func (l *tliteral) Eval(i *Interp) TclStatus {
 type subcommand struct {
 	notExpand
 	cmd command
+	loc loc
 }
 
 func (s *subcommand) String() string { return "[" + s.cmd.String() + "]" }
@@ -61,6 +63,7 @@ type block struct {
 	notExpand
 	strval string
 	tval   *TclObj
+	loc    loc
 }
 
 func (b *block) String() string { return "{" + b.strval + "}" }
@@ -82,6 +85,7 @@ func (b *block) Eval(i *Interp) TclStatus {
 // {*}{...}
 type expandTok struct {
 	subject tclTok
+	loc     loc
 }
 
 func (e *expandTok) isExpand() bool {
@@ -301,6 +305,7 @@ type Interp struct {
 	retval   *TclObj
 	err      error
 	cmdcount int
+	file     string
 }
 
 func (i *Interp) Return(val *TclObj) TclStatus {
@@ -371,7 +376,7 @@ func (t *TclObj) AsInt() (int, error) {
 
 func (t *TclObj) asCmds() ([]command, error) {
 	if t.cmdsval == nil {
-		c, e := parseCommands(strings.NewReader(t.AsString()))
+		c, e := parseCommands(strings.NewReader(t.AsString()), "<cmds>")
 		if e != nil {
 			return nil, e
 		}
@@ -469,7 +474,7 @@ func (t *TclObj) asExpr() (eterm, error) {
 }
 
 func parseList(txt string) ([]*TclObj, error) {
-	lst, err := parseListInner(strings.NewReader(txt))
+	lst, err := parseListInner(strings.NewReader(txt), "<list>")
 	if err != nil {
 		return nil, err
 	}
@@ -577,6 +582,10 @@ func NewInterp() *Interp {
 	i.SetCmd("proc", tclProc)
 	i.SetCmd("error", func(ni *Interp, args []*TclObj) TclStatus { return i.FailStr(args[0].AsString()) })
 	return i
+}
+
+func (i *Interp) SetSource(file string) {
+	i.file = file
 }
 
 type TclCmd func(*Interp, []*TclObj) TclStatus
@@ -764,7 +773,7 @@ func (i *Interp) EvalString(s string) (*TclObj, error) {
 }
 
 func (i *Interp) Run(in io.Reader) (*TclObj, error) {
-	cmds, e := parseCommands(bufio.NewReader(in))
+	cmds, e := parseCommands(bufio.NewReader(in), i.file)
 	if e != nil {
 		return nil, e
 	}

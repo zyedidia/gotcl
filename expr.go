@@ -184,35 +184,35 @@ var timesOp = &binaryOp{name: "*", precedence: 3,
 	action: func(a, b *TclObj) (*TclObj, error) {
 		i1, i2, e := asInts(a, b)
 		return FromInt(i1 * i2), e
-				}}
+	}}
 var divideOp = &binaryOp{name: "/", precedence: 3,
 	action: func(a, b *TclObj) (*TclObj, error) {
 		i1, i2, e := asInts(a, b)
 		return FromInt(i1 / i2), e
-				}}
+	}}
 var xorOp = &binaryOp{name: "^", precedence: 3,
 	action: func(a, b *TclObj) (*TclObj, error) {
 		i1, i2, e := asInts(a, b)
 		return FromInt(i1 ^ i2), e
-				}}
+	}}
 var lshiftOp = &binaryOp{name: "<<", precedence: 4,
 	action: func(a, b *TclObj) (*TclObj, error) {
 		i1, i2, e := asInts(a, b)
 		return FromInt(i1 << uint(i2)), e
-				}}
+	}}
 var rshiftOp = &binaryOp{name: ">>", precedence: 4,
 	action: func(a, b *TclObj) (*TclObj, error) {
 		i1, i2, e := asInts(a, b)
 		return FromInt(i1 >> uint(i2)), e
-				}}
+	}}
 var equalsOp = &binaryOp{name: "==", precedence: 1,
 	action: func(a, b *TclObj) (*TclObj, error) {
 		return FromBool(a.AsString() == b.AsString()), nil
-					}}
+	}}
 var notEqualsOp = &binaryOp{name: "!=", precedence: 1,
 	action: func(a, b *TclObj) (*TclObj, error) {
 		return FromBool(a.AsString() != b.AsString()), nil
-				}}
+	}}
 var andOp = &binaryOp{name: "&&", precedence: 0,
 	action: func(a, b *TclObj) (*TclObj, error) {
 		return FromBool(a.AsBool() && b.AsBool()), nil
@@ -263,7 +263,7 @@ var ltOp = &binaryOp{name: "<", precedence: -1,
 	action: func(a, b *TclObj) (*TclObj, error) {
 		i1, i2, e := asInts(a, b)
 		return FromBool(i1 < i2), e
-				}}
+	}}
 var lteOp = &binaryOp{name: "<=", precedence: -1,
 	action: func(a, b *TclObj) (*TclObj, error) {
 		i1, i2, e := asInts(a, b)
@@ -294,7 +294,7 @@ func balance(b *binOpNode) eterm {
 }
 
 func parseExpr(in io.RuneReader) (item eterm, err error) {
-	p := newParser(in)
+	p := newParser(in, "<expr>")
 	defer setError(&err)
 	item = p.parseExpr()
 	return

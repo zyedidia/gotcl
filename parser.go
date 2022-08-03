@@ -2,19 +2,39 @@ package gotcl
 
 import (
 	"bytes"
-	"errors"
+	"fmt"
 	"io"
+	"os"
 	"unicode"
 )
+
+type loc struct {
+	file string
+	line int
+	col  int
+}
+
+func (l loc) String() string {
+	return fmt.Sprintf("%s:%d:%d", l.file, l.line, l.col)
+}
 
 type parser struct {
 	data   io.RuneReader
 	tmpbuf *bytes.Buffer
 	ch     rune
+	src    loc
 }
 
-func newParser(input io.RuneReader) *parser {
-	p := &parser{data: input, tmpbuf: bytes.NewBuffer(make([]byte, 0, 1024))}
+func newParser(input io.RuneReader, name string) *parser {
+	p := &parser{
+		data:   input,
+		tmpbuf: bytes.NewBuffer(make([]byte, 0, 1024)),
+		src: loc{
+			file: name,
+			line: 1,
+			col:  0,
+		},
+	}
 	p.advance()
 	return p
 }
@@ -25,7 +45,8 @@ func isvarword(c rune) bool {
 }
 
 func (p *parser) fail(s string) {
-	panic(errors.New(s))
+	fmt.Fprintf(os.Stderr, "%v: %s\n", p.src, s)
+	os.Exit(1)
 }
 
 func (p *parser) advance() (result rune) {
@@ -33,13 +54,18 @@ func (p *parser) advance() (result rune) {
 		p.fail("unexpected EOF")
 	}
 	result = p.ch
-	r, _, e := p.data.ReadRune()
+	r, sz, e := p.data.ReadRune()
 	if e != nil {
 		if e != io.EOF {
 			p.fail(e.Error())
 		}
 		p.ch = -1
 	} else {
+		p.src.col += sz
+		if r == '\n' {
+			p.src.col = 0
+			p.src.line++
+		}
 		p.ch = r
 	}
 	return
@@ -114,7 +140,7 @@ func (p *parser) parseSimpleWordTil(til rune) *tliteral {
 	if len(res) == 0 {
 		p.expectFailed("word", p.ch)
 	}
-	return &tliteral{strval: res}
+	return &tliteral{strval: res, loc: p.src}
 }
 
 func (p *parser) parseSubcommand() *subcommand {
@@ -126,7 +152,7 @@ func (p *parser) parseSubcommand() *subcommand {
 		p.eatWhile(issepspace)
 	}
 	p.consumeRune(']')
-	return &subcommand{cmd: makeCommand(res)}
+	return &subcommand{cmd: makeCommand(res), loc: p.src}
 }
 
 func (p *parser) parseBlockData() string {
@@ -150,7 +176,6 @@ func (p *parser) parseBlockData() string {
 		}
 		p.tmpbuf.WriteRune(p.advance())
 	}
-	return "" // never happens.
 }
 
 func (p *parser) hasExtraChars() bool {
@@ -166,16 +191,16 @@ func (p *parser) checkForExtraChars() {
 func (p *parser) parseBlock() *block {
 	bd := p.parseBlockData()
 	p.checkForExtraChars()
-	return &block{strval: bd}
+	return &block{strval: bd, loc: p.src}
 }
 
 func (p *parser) parseBlockOrExpand() tclTok {
 	bd := p.parseBlockData()
 	if bd == "*" && p.hasExtraChars() {
-		return &expandTok{p.parseToken()}
+		return &expandTok{subject: p.parseToken(), loc: p.src}
 	}
 	p.checkForExtraChars()
-	return &block{strval: bd}
+	return &block{strval: bd, loc: p.src}
 }
 
 func (p *parser) parseVariable() varRef {
@@ -233,7 +258,6 @@ func (p *parser) parseListStringLit() string {
 			buf.WriteRune(p.advance())
 		}
 	}
-	panic("unreachable")
 }
 
 func (p *parser) parseStringLit() strlit {
@@ -269,7 +293,6 @@ func (p *parser) parseStringLit() strlit {
 			accum.WriteRune(p.advance())
 		}
 	}
-	panic("unreachable")
 }
 
 func isEol(ch rune) bool {
@@ -362,15 +385,15 @@ func setError(err *error) {
 	}
 }
 
-func parseListInner(in io.RuneReader) (items []string, err error) {
-	p := newParser(in)
+func parseListInner(in io.RuneReader, name string) (items []string, err error) {
+	p := newParser(in, name)
 	defer setError(&err)
 	items = p.parseList()
 	return
 }
 
-func parseCommands(in io.RuneReader) (cmds []command, err error) {
-	p := newParser(in)
+func parseCommands(in io.RuneReader, name string) (cmds []command, err error) {
+	p := newParser(in, name)
 	defer setError(&err)
 	cmds = p.parseCommands()
 	return
