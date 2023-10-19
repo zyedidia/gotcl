@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"strconv"
@@ -324,7 +323,8 @@ func (i *Interp) Return(val *TclObj) TclStatus {
 }
 
 func (i *Interp) Fail(err error) TclStatus {
-	i.err = fmt.Errorf("%v: %v", i.loc, err)
+	// i.err = fmt.Errorf("%v: %v", i.loc, err)
+	i.err = err
 	return kTclErr
 }
 
@@ -596,6 +596,17 @@ func NewInterp() *Interp {
 
 	i.SetCmd("proc", tclProc)
 	i.SetCmd("error", func(ni *Interp, args []*TclObj) TclStatus { return i.FailStr(args[0].AsString()) })
+	return i
+}
+
+func NewInterpFrom(old *Interp) *Interp {
+	i := new(Interp)
+	i.cmds = old.cmds
+	i.frame = newstackframe(nil)
+	i.chans = make(map[string]interface{})
+	i.chans["stdin"] = tclStdin
+	i.chans["stdout"] = os.Stdout
+	i.chans["stderr"] = os.Stderr
 	return i
 }
 
