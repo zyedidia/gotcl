@@ -367,7 +367,7 @@ func (t *TclObj) AsString() string {
 			ss := str.String()
 			t.value = &ss
 		} else {
-			panic("unable to stringify TclObj")
+			return ""
 		}
 	}
 	return *t.value

@@ -199,21 +199,6 @@ func tclIf(i *Interp, args []*TclObj) TclStatus {
 	return i.Return(kNil)
 }
 
-func tclExit(i *Interp, args []*TclObj) TclStatus {
-	code := 0
-	if len(args) == 1 {
-		iv, err := args[0].AsInt()
-		if err != nil {
-			return i.Fail(err)
-		}
-		code = iv
-	} else if len(args) != 0 {
-		i.FailStr("wrong # args")
-	}
-	os.Exit(code)
-	return kTclOK
-}
-
 func tclWhile(i *Interp, args []*TclObj) TclStatus {
 	if len(args) != 2 {
 		return i.FailStr("wrong # args")
@@ -899,7 +884,6 @@ func init() {
 		"concat":   tclConcat,
 		"continue": tclContinue,
 		"eval":     tclEval,
-		"exit":     tclExit,
 		"expr":     tclExpr,
 		"flush":    tclFlush,
 		"for":      tclFor,

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"os"
 	"unicode"
 )
 
@@ -41,8 +40,7 @@ func isvarword(c rune) bool {
 }
 
 func (p *parser) fail(s string) {
-	fmt.Fprintf(os.Stderr, "%v: %s\n", p.src, s)
-	os.Exit(1)
+	panic(fmt.Errorf("parse error: %s\n", s))
 }
 
 func (p *parser) advance() (result rune) {
