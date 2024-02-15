@@ -703,9 +703,9 @@ func strIndex(i *Interp, args []*TclObj) TclStatus {
 }
 
 var arrayEn = ensembleSpec{
-	"size": arraySize,
-	"get":  arrayGet,
-	"set":  arraySet,
+	"size":   arraySize,
+	"get":    arrayGet,
+	"setvar": arraySet,
 	"exists": func(i *Interp, args []*TclObj) TclStatus {
 		if len(args) != 1 {
 			return i.FailStr("wrong # args")
@@ -901,7 +901,7 @@ func init() {
 		"puts":     tclPuts,
 		"rename":   tclRename,
 		"return":   tclReturn,
-		"set":      tclSet,
+		"setvar":   tclSet,
 		"source":   tclSource,
 		"split":    tclSplit,
 		"string":   stringEn.makeCmd(),
